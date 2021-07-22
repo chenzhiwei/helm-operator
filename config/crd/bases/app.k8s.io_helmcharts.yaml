@@ -36,10 +36,12 @@ spec:
           spec:
             description: HelmChartSpec defines the desired state of HelmChart
             properties:
-              foo:
-                description: Foo is an example field of HelmChart. Edit helmchart_types.go
-                  to remove/update
+              chart:
                 type: string
+              values:
+                type: object
+            required:
+            - chart
             type: object
           status:
             description: HelmChartStatus defines the observed state of HelmChart

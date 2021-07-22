@@ -22,9 +22,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appv1 "github.com/chenzhiwei/helm-operator/api/v1"
+	"github.com/chenzhiwei/helm-operator/utils/constant"
+	"github.com/chenzhiwei/helm-operator/utils/helm"
 )
 
 // HelmChartReconciler reconciles a HelmChart object
@@ -47,11 +50,53 @@ type HelmChartReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
 func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 
-	// your logic here
+	cr := &appv1.HelmChart{}
+	if err := r.Get(ctx, req.NamespacedName, cr); err != nil {
+		logger.Error(err, "Failed to get HelmChart")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	// handle finalizer logic
+	if cr.DeletionTimestamp == nil {
+		// add finalizer
+		if !controllerutil.ContainsFinalizer(cr, constant.FinalizerName) {
+			controllerutil.AddFinalizer(cr, constant.FinalizerName)
+			if err := r.Update(ctx, cr); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	} else {
+		// The CR is being deleted
+		// delete external resource
+		if err := r.cleanResources(cr); err != nil {
+			return ctrl.Result{}, err
+		}
+		// delete finalizer
+		if controllerutil.ContainsFinalizer(cr, constant.FinalizerName) {
+			controllerutil.RemoveFinalizer(cr, constant.FinalizerName)
+			if err := r.Update(ctx, cr); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	}
+
+	manifests, err := helm.GetManifests(cr.Name, cr.Namespace, cr.Spec.Chart, cr.Spec.Values.Raw)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	for _, m := range manifests {
+		logger.Info("Deploying file name", m.Name)
+		logger.Info("Deploying file content", m.Content)
+	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *HelmChartReconciler) cleanResources(cr *appv1.HelmChart) error {
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
