@@ -36,9 +36,9 @@ type HelmChartReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=app.k8s.io,resources=helmcharts,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=app.k8s.io,resources=helmcharts/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=app.k8s.io,resources=helmcharts/finalizers,verbs=update
+//+kubebuilder:rbac:groups=app.siji.io,resources=helmcharts,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=app.siji.io,resources=helmcharts/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=app.siji.io,resources=helmcharts/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

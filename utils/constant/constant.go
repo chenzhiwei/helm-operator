@@ -1,3 +1,3 @@
 package constant
 
-const FinalizerName string = "app.k8s.io/finalizer"
+const FinalizerName string = "app.siji.io/finalizer"

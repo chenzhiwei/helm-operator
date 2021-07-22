@@ -6,9 +6,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.4.1
   creationTimestamp: null
-  name: helmcharts.app.k8s.io
+  name: helmcharts.app.siji.io
 spec:
-  group: app.k8s.io
+  group: app.siji.io
   names:
     kind: HelmChart
     listKind: HelmChartList
