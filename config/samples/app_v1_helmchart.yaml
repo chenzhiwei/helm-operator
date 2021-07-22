@@ -1,0 +1,7 @@
+apiVersion: app.k8s.io/v1
+kind: HelmChart
+metadata:
+  name: helmchart-sample
+spec:
+  # Add fields here
+  foo: bar
