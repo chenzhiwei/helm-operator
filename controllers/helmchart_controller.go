@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -28,6 +29,7 @@ import (
 	appv1 "github.com/chenzhiwei/helm-operator/api/v1"
 	"github.com/chenzhiwei/helm-operator/utils/constant"
 	"github.com/chenzhiwei/helm-operator/utils/helm"
+	"github.com/chenzhiwei/helm-operator/utils/yaml"
 )
 
 // HelmChartReconciler reconciles a HelmChart object
@@ -84,12 +86,31 @@ func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	manifests, err := helm.GetManifests(cr.Name, cr.Namespace, cr.Spec.Chart, cr.Spec.Values.Raw)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, err
 	}
 
+	// var objects []*unstructured.Unstructured
 	for _, m := range manifests {
-		logger.Info("Deploying file name", "====", m.Name)
-		logger.Info("Deploying file content", "====", m.Content)
+		obj, _ := yaml.YamlToObject([]byte(m.Content))
+
+		// set namespace to obj, ignore failure because failure means cluster scoped resource
+		ns := obj.GetNamespace()
+		if ns == "" {
+			obj.SetNamespace(cr.Namespace)
+		}
+
+		if obj.GetNamespace() == cr.Namespace {
+			if err := controllerutil.SetControllerReference(cr, obj, r.Scheme); err != nil {
+				return ctrl.Result{}, err
+			}
+		} else {
+			// store the cluster scoped resource somewhere for cleanResources
+		}
+
+		// create or update the object one by one
+
+		// objects = append(objects, obj)
+
 	}
 
 	return ctrl.Result{}, nil

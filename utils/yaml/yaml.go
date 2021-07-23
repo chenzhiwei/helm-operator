@@ -15,9 +15,23 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 	"k8s.io/apimachinery/pkg/types"
-	klog "k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	goyaml "sigs.k8s.io/yaml"
 )
+
+func YamlToObject(yamlContent []byte) (*unstructured.Unstructured, error) {
+	obj := &unstructured.Unstructured{}
+	jsonSpec, err := goyaml.YAMLToJSON(yamlContent)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to convert yaml to json: %v", err)
+	}
+
+	if err := obj.UnmarshalJSON(jsonSpec); err != nil {
+		return nil, fmt.Errorf("Failed to unmarshal resource: %v", err)
+	}
+
+	return obj, nil
+}
 
 func yamlToObjects(yamlContent []byte) ([]*unstructured.Unstructured, error) {
 	yamlDecoder := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
@@ -88,12 +102,12 @@ func CreateOrUpdateFromBytes(content []byte, client client.Client, reader client
 	var errMsg string
 
 	for _, obj := range objects {
-		gvk := obj.GetObjectKind().GroupVersionKind()
+		// gvk := obj.GetObjectKind().GroupVersionKind()
 
 		objInCluster, err := getObject(obj, reader)
 		if errors.IsNotFound(err) {
 			if err := createObject(obj, client); err != nil {
-				klog.Infof("create resource with name: %s, namespace: %s, kind: %s, apiversion: %s/%s\n", obj.GetName(), obj.GetNamespace(), gvk.Kind, gvk.Group, gvk.Version)
+				// klog.Infof("create resource with name: %s, namespace: %s, kind: %s, apiversion: %s/%s\n", obj.GetName(), obj.GetNamespace(), gvk.Kind, gvk.Group, gvk.Version)
 				errMsg = errMsg + err.Error()
 			}
 			continue
