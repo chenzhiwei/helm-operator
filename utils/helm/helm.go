@@ -1,6 +1,8 @@
 package helm
 
 import (
+	"strings"
+
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
@@ -59,6 +61,12 @@ func GetManifests(name, namespace, path string, bytes []byte) ([]releaseutil.Man
 	files, err := engine.Render(chart, values)
 	if err != nil {
 		return nil, err
+	}
+
+	for k := range files {
+		if strings.HasSuffix(k, ".txt") || strings.HasPrefix(k, "_") {
+			delete(files, k)
+		}
 	}
 
 	// Don't handle hooks

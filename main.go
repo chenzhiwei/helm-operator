@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -28,11 +29,13 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	appv1 "github.com/chenzhiwei/helm-operator/api/v1"
 	"github.com/chenzhiwei/helm-operator/controllers"
+	"github.com/chenzhiwei/helm-operator/utils/yaml"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -78,17 +81,28 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.HelmChartReconciler{
+	if err := createCRD(mgr.GetClient(), mgr.GetAPIReader()); err != nil {
+		setupLog.Error(err, "unable to create controller resources", "controller", "HelmChart")
+		os.Exit(1)
+	}
+
+	if err := (&controllers.HelmChartReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HelmChart")
 		os.Exit(1)
 	}
-	// if err = (&appv1.HelmChart{}).SetupWebhookWithManager(mgr); err != nil {
-	// 	setupLog.Error(err, "unable to create webhook", "webhook", "HelmChart")
-	// 	os.Exit(1)
-	// }
+	if os.Getenv("WEBHOOKS_ENABLED") == "true" {
+		if err := createWebhooks(mgr.GetClient(), mgr.GetAPIReader()); err != nil {
+			setupLog.Error(err, "unable to create webhook resources", "webhook", "HelmChart")
+			os.Exit(1)
+		}
+		if err := (&appv1.HelmChart{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "HelmChart")
+			os.Exit(1)
+		}
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -105,4 +119,29 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func createCRD(client client.Client, reader client.Reader) error {
+	path := "config/crd/bases/app.siji.io_helmcharts.yaml"
+	return yaml.CreateOrUpdateFromYaml(path, client, reader)
+}
+
+func createWebhooks(client client.Client, reader client.Reader) error {
+	files := []string{
+		"config/webhook/service.yaml",
+		"config/webhook/manifests.yaml",
+	}
+
+	var errMsg string
+
+	for _, path := range files {
+		if err := yaml.CreateOrUpdateFromYaml(path, client, reader); err != nil {
+			errMsg = errMsg + err.Error()
+		}
+	}
+
+	if errMsg != "" {
+		return fmt.Errorf("Failed to create webhooks: %v", errMsg)
+	}
+	return nil
 }

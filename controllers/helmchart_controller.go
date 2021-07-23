@@ -88,8 +88,8 @@ func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	for _, m := range manifests {
-		logger.Info("Deploying file name", m.Name)
-		logger.Info("Deploying file content", m.Content)
+		logger.Info("Deploying file name", "====", m.Name)
+		logger.Info("Deploying file content", "====", m.Content)
 	}
 
 	return ctrl.Result{}, nil

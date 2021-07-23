@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"reflect"
+	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -18,7 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func YamlToObjects(yamlContent []byte) ([]*unstructured.Unstructured, error) {
+func yamlToObjects(yamlContent []byte) ([]*unstructured.Unstructured, error) {
 	yamlDecoder := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
 
 	var objects []*unstructured.Unstructured
@@ -30,7 +31,6 @@ func YamlToObjects(yamlContent []byte) ([]*unstructured.Unstructured, error) {
 			if err == io.EOF {
 				break
 			}
-			klog.Infof("Failed to convert object: %v", err)
 			continue
 		}
 
@@ -45,7 +45,7 @@ func YamlToObjects(yamlContent []byte) ([]*unstructured.Unstructured, error) {
 	return objects, nil
 }
 
-func GetObject(obj *unstructured.Unstructured, reader client.Reader) (*unstructured.Unstructured, error) {
+func getObject(obj *unstructured.Unstructured, reader client.Reader) (*unstructured.Unstructured, error) {
 	found := &unstructured.Unstructured{}
 	found.SetGroupVersionKind(obj.GetObjectKind().GroupVersionKind())
 
@@ -54,7 +54,7 @@ func GetObject(obj *unstructured.Unstructured, reader client.Reader) (*unstructu
 	return found, err
 }
 
-func CreateObject(obj *unstructured.Unstructured, client client.Client) error {
+func createObject(obj *unstructured.Unstructured, client client.Client) error {
 	err := client.Create(context.TODO(), obj)
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return fmt.Errorf("Failed to create resource: %v", err)
@@ -63,7 +63,7 @@ func CreateObject(obj *unstructured.Unstructured, client client.Client) error {
 	return nil
 }
 
-func UpdateObject(obj *unstructured.Unstructured, client client.Client) error {
+func updateObject(obj *unstructured.Unstructured, client client.Client) error {
 	if err := client.Update(context.TODO(), obj); err != nil {
 		return fmt.Errorf("Failed to update resource: %v", err)
 	}
@@ -71,10 +71,65 @@ func UpdateObject(obj *unstructured.Unstructured, client client.Client) error {
 	return nil
 }
 
-func DeleteObject(obj *unstructured.Unstructured, client client.Client) error {
+func deleteObject(obj *unstructured.Unstructured, client client.Client) error {
 	if err := client.Delete(context.TODO(), obj); err != nil {
 		return fmt.Errorf("Failed to delete resource: %v", err)
 	}
 
 	return nil
+}
+
+func CreateOrUpdateFromBytes(content []byte, client client.Client, reader client.Reader) error {
+	objects, err := yamlToObjects(content)
+	if err != nil {
+		return err
+	}
+
+	var errMsg string
+
+	for _, obj := range objects {
+		gvk := obj.GetObjectKind().GroupVersionKind()
+
+		objInCluster, err := getObject(obj, reader)
+		if errors.IsNotFound(err) {
+			if err := createObject(obj, client); err != nil {
+				klog.Infof("create resource with name: %s, namespace: %s, kind: %s, apiversion: %s/%s\n", obj.GetName(), obj.GetNamespace(), gvk.Kind, gvk.Group, gvk.Version)
+				errMsg = errMsg + err.Error()
+			}
+			continue
+		} else if err != nil {
+			errMsg = errMsg + err.Error()
+			continue
+		}
+
+		annoVersion := obj.GetAnnotations()["version"]
+		if annoVersion == "" {
+			annoVersion = "0"
+		}
+		annoVersionInCluster := objInCluster.GetAnnotations()["version"]
+		if annoVersionInCluster == "" {
+			annoVersionInCluster = "0"
+		}
+
+		version, _ := strconv.Atoi(annoVersion)
+		versionInCluster, _ := strconv.Atoi(annoVersionInCluster)
+		if version > versionInCluster {
+			// Deepin merge and update the object
+		}
+	}
+
+	if errMsg != "" {
+		return fmt.Errorf("Failed to create resource: %v", errMsg)
+	}
+
+	return nil
+}
+
+func CreateOrUpdateFromYaml(path string, client client.Client, reader client.Reader) error {
+	content, err := ioutil.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	return CreateOrUpdateFromBytes(content, client, reader)
 }

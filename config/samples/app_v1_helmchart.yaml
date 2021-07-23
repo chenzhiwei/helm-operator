@@ -3,5 +3,9 @@ kind: HelmChart
 metadata:
   name: helmchart-sample
 spec:
-  # Add fields here
-  foo: bar
+  chart: https://storage.googleapis.com/t3n-helm-charts/nginx-0.1.1.tgz
+  values:
+    replicaCount: 3
+    image:
+      repository: docker.io/siji/nginx
+      tag: latest
