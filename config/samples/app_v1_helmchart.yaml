@@ -3,9 +3,9 @@ kind: HelmChart
 metadata:
   name: helmchart-sample
 spec:
-  chart: https://storage.googleapis.com/t3n-helm-charts/nginx-0.1.1.tgz
+  chart: https://gitlab.com/chenzhiwei/charts/-/raw/master/release/nginx-0.1.0.tgz
   values:
-    replicaCount: 3
+    replicaCount: 2
     image:
       repository: docker.io/siji/nginx
       tag: latest

@@ -20,13 +20,15 @@ import (
 	"context"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	netv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appv1 "github.com/chenzhiwei/helm-operator/api/v1"
 	"github.com/chenzhiwei/helm-operator/utils/constant"
@@ -54,11 +56,13 @@ type HelmChartReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
 func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
+	log := ctrl.LoggerFrom(ctx)
 
 	cr := &appv1.HelmChart{}
 	if err := r.Get(ctx, req.NamespacedName, cr); err != nil {
-		logger.Error(err, "Failed to get HelmChart")
+		if !errors.IsNotFound(err) {
+			log.Error(err, "Failed to get HelmChart")
+		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -88,6 +92,7 @@ func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	manifests, err := helm.GetManifests(cr.Name, cr.Namespace, cr.Spec.Chart, cr.Spec.Values.Raw)
 	if err != nil {
+		log.Error(err, "Failed to generate Helm manifests, will retry in 5 seconds")
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, err
 	}
 
@@ -109,6 +114,7 @@ func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// store the cluster scoped resource somewhere for cleanResources
 		}
 
+		log.Info("Creating Helm manifest", "Object", obj)
 		// create or update the object one by one
 		if err := r.createOrUpdate(obj); err != nil {
 			return ctrl.Result{}, err
@@ -132,7 +138,16 @@ func (r *HelmChartReconciler) cleanResources(cr *appv1.HelmChart) error {
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *HelmChartReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// Only watch these widely used resources
+	// The reconcile period is 5 hours which is for other resources
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appv1.HelmChart{}).
+		Owns(&corev1.Service{}).
+		Owns(&corev1.Secret{}).
+		Owns(&corev1.ConfigMap{}).
+		Owns(&appsv1.DaemonSet{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&appsv1.StatefulSet{}).
+		Owns(&netv1.Ingress{}).
 		Complete(r)
 }
