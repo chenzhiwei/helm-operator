@@ -20,6 +20,8 @@ import (
 	"context"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -108,12 +110,20 @@ func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 
 		// create or update the object one by one
-
-		// objects = append(objects, obj)
-
+		if err := r.createOrUpdate(obj); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *HelmChartReconciler) createOrUpdate(obj *unstructured.Unstructured) error {
+	ctx := context.Background()
+	if err := r.Client.Create(ctx, obj); err != nil && !errors.IsAlreadyExists(err) {
+		return err
+	}
+	return nil
 }
 
 func (r *HelmChartReconciler) cleanResources(cr *appv1.HelmChart) error {

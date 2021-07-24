@@ -102,12 +102,10 @@ func CreateOrUpdateFromBytes(content []byte, client client.Client, reader client
 	var errMsg string
 
 	for _, obj := range objects {
-		// gvk := obj.GetObjectKind().GroupVersionKind()
 
 		objInCluster, err := getObject(obj, reader)
 		if errors.IsNotFound(err) {
 			if err := createObject(obj, client); err != nil {
-				// klog.Infof("create resource with name: %s, namespace: %s, kind: %s, apiversion: %s/%s\n", obj.GetName(), obj.GetNamespace(), gvk.Kind, gvk.Group, gvk.Version)
 				errMsg = errMsg + err.Error()
 			}
 			continue
@@ -128,6 +126,7 @@ func CreateOrUpdateFromBytes(content []byte, client client.Client, reader client
 		version, _ := strconv.Atoi(annoVersion)
 		versionInCluster, _ := strconv.Atoi(annoVersionInCluster)
 		if version > versionInCluster {
+			obj.SetResourceVersion(objInCluster.GetResourceVersion())
 			// Deepin merge and update the object
 		}
 	}
