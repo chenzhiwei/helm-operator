@@ -19,13 +19,11 @@ package v1
 import (
 	"context"
 	"net/http"
-	"strings"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -99,6 +97,10 @@ func (h *validatorHandler) Handle(ctx context.Context, req admission.Request) ad
 }
 
 func (h *validatorHandler) checkPermission(ctx context.Context, userInfo authenticationv1.UserInfo, obj *unstructured.Unstructured) (bool, error) {
+	mapper, err := h.Client.RESTMapper().RESTMapping(obj.GroupVersionKind().GroupKind(), obj.GroupVersionKind().Version)
+	if err != nil {
+		return false, err
+	}
 	sar := &authorizationv1.SubjectAccessReview{
 		Spec: authorizationv1.SubjectAccessReviewSpec{
 			ResourceAttributes: &authorizationv1.ResourceAttributes{
@@ -106,7 +108,7 @@ func (h *validatorHandler) checkPermission(ctx context.Context, userInfo authent
 				Verb:      "*",
 				Group:     obj.GroupVersionKind().Group,
 				Version:   obj.GroupVersionKind().Version,
-				Resource:  resourceFromGVK(obj.GroupVersionKind()),
+				Resource:  mapper.Resource.Resource,
 			},
 			UID:    userInfo.UID,
 			User:   userInfo.Username,
@@ -118,7 +120,7 @@ func (h *validatorHandler) checkPermission(ctx context.Context, userInfo authent
 	if err := h.Client.Create(ctx, sar); err != nil {
 		return false, err
 	}
-	return true, nil
+	return sar.Status.Allowed, nil
 }
 
 func convertToSARExtra(extra map[string]authenticationv1.ExtraValue) map[string]authorizationv1.ExtraValue {
@@ -131,9 +133,4 @@ func convertToSARExtra(extra map[string]authenticationv1.ExtraValue) map[string]
 	}
 
 	return ret
-}
-
-func resourceFromGVK(gvk schema.GroupVersionKind) string {
-	// TODO: call k8s api to get the resource name
-	return strings.ToLower(gvk.Kind) + "s"
 }
