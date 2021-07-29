@@ -22,6 +22,9 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager main.go
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/manager .
+COPY config/crd/bases/app.siji.io_helmcharts.yaml ./config/crd/bases/app.siji.io_helmcharts.yaml
+COPY config/webhook/manifests.yaml ./config/webhook/manifests.yaml
+COPY config/webhook/service.yaml ./config/webhook/service.yaml
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]
