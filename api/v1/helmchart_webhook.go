@@ -75,7 +75,7 @@ func (h *validatorHandler) Handle(ctx context.Context, req admission.Request) ad
 	userInfo := req.UserInfo
 
 	if req.Operation == admissionv1.Create || req.Operation == admissionv1.Update {
-		manifests, err := helm.GetManifests(helmChart.Name, helmChart.Namespace, helmChart.Spec.Chart, helmChart.Spec.Values.Raw)
+		manifests, err := helm.GetManifests(helmChart.Name, helmChart.Namespace, helmChart.Spec.Chart.Path, helmChart.Spec.Values.Raw)
 		if err != nil {
 			helmchartlog.Error(err, "Failed to get Helm manifests")
 			return admission.Errored(http.StatusBadRequest, err)

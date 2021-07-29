@@ -37,7 +37,16 @@ spec:
             description: HelmChartSpec defines the desired state of HelmChart
             properties:
               chart:
-                type: string
+                properties:
+                  password:
+                    type: string
+                  path:
+                    type: string
+                  username:
+                    type: string
+                required:
+                - path
+                type: object
               values:
                 type: object
                 x-kubernetes-preserve-unknown-fields: true

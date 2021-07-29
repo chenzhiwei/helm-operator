@@ -29,10 +29,16 @@ type HelmChartSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	Chart string `json:"chart"`
+	Chart Chart `json:"chart"`
 
 	// +kubebuilder:pruning:PreserveUnknownFields
 	Values runtime.RawExtension `json:"values,omitempty"`
+}
+
+type Chart struct {
+	Path     string `json:"path"`
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
 }
 
 // HelmChartStatus defines the observed state of HelmChart

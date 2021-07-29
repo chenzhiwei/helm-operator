@@ -90,7 +90,7 @@ func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 	}
 
-	manifests, err := helm.GetManifests(cr.Name, cr.Namespace, cr.Spec.Chart, cr.Spec.Values.Raw)
+	manifests, err := helm.GetManifests(cr.Name, cr.Namespace, cr.Spec.Chart.Path, cr.Spec.Values.Raw)
 	if err != nil {
 		log.Error(err, "Failed to generate Helm manifests, will retry in 5 seconds")
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, err
