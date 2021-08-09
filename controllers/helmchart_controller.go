@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -66,21 +65,13 @@ func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// handle finalizer logic
-	if cr.DeletionTimestamp == nil {
-		// add finalizer
-		if !controllerutil.ContainsFinalizer(cr, constant.FinalizerName) {
-			controllerutil.AddFinalizer(cr, constant.FinalizerName)
-			if err := r.Update(ctx, cr); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-	} else {
-		// The CR is being deleted
-		// delete external resource
+	// The CR is being deleted
+	if cr.DeletionTimestamp != nil {
+		// delete resources in other namespaces or cluster scoped resources
 		if err := r.cleanResources(cr); err != nil {
 			return ctrl.Result{}, err
 		}
+
 		// delete finalizer
 		if controllerutil.ContainsFinalizer(cr, constant.FinalizerName) {
 			controllerutil.RemoveFinalizer(cr, constant.FinalizerName)
@@ -88,12 +79,22 @@ func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 				return ctrl.Result{}, err
 			}
 		}
+
+		return ctrl.Result{}, nil
+	}
+
+	// add finalizer
+	if !controllerutil.ContainsFinalizer(cr, constant.FinalizerName) {
+		controllerutil.AddFinalizer(cr, constant.FinalizerName)
+		if err := r.Update(ctx, cr); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	manifests, err := helm.GetManifests(cr.Name, cr.Namespace, cr.Spec.Chart.Path, cr.Spec.Values.Raw)
 	if err != nil {
-		log.Error(err, "Failed to generate Helm manifests, will retry in 5 seconds")
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, err
+		log.Error(err, "Failed to generate Helm manifests")
+		return ctrl.Result{}, err
 	}
 
 	// var objects []*unstructured.Unstructured
