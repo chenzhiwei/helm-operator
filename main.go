@@ -84,10 +84,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := createCRD(mgr.GetClient(), mgr.GetAPIReader()); err != nil {
-		setupLog.Error(err, "unable to create controller resources", "controller", "HelmChart")
-		os.Exit(1)
-	}
+	// if err := createCRD(mgr.GetClient(), mgr.GetAPIReader()); err != nil {
+	// 	setupLog.Error(err, "unable to create controller resources", "controller", "HelmChart")
+	// 	os.Exit(1)
+	// }
 
 	if err := (&controllers.HelmChartReconciler{
 		Client: mgr.GetClient(),
@@ -97,10 +97,10 @@ func main() {
 		os.Exit(1)
 	}
 	if os.Getenv("WEBHOOKS_ENABLED") == "true" {
-		if err := createWebhooks(mgr.GetClient(), mgr.GetAPIReader()); err != nil {
-			setupLog.Error(err, "unable to create webhook resources", "webhook", "HelmChart")
-			os.Exit(1)
-		}
+		// if err := createWebhooks(mgr.GetClient(), mgr.GetAPIReader()); err != nil {
+		// 	setupLog.Error(err, "unable to create webhook resources", "webhook", "HelmChart")
+		// 	os.Exit(1)
+		// }
 		if err := (&appv1.HelmChart{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "HelmChart")
 			os.Exit(1)
