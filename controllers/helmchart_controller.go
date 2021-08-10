@@ -23,7 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,6 +31,7 @@ import (
 	appv1 "github.com/chenzhiwei/helm-operator/api/v1"
 	"github.com/chenzhiwei/helm-operator/utils/constant"
 	"github.com/chenzhiwei/helm-operator/utils/helm"
+	"github.com/chenzhiwei/helm-operator/utils/pointer"
 	"github.com/chenzhiwei/helm-operator/utils/yaml"
 )
 
@@ -116,21 +116,17 @@ func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 
 		log.Info("Creating Helm manifest", "Object", obj)
-		// create or update the object one by one
-		if err := r.createOrUpdate(obj); err != nil {
+		// TODO: better server side apply
+		patchOptions := &client.PatchOptions{
+			FieldManager: "helmchart-controller",
+			Force:        pointer.Bool(true),
+		}
+		if err := r.Client.Patch(ctx, obj, client.Apply, patchOptions); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
 
 	return ctrl.Result{}, nil
-}
-
-func (r *HelmChartReconciler) createOrUpdate(obj *unstructured.Unstructured) error {
-	ctx := context.Background()
-	if err := r.Client.Create(ctx, obj); err != nil && !errors.IsAlreadyExists(err) {
-		return err
-	}
-	return nil
 }
 
 func (r *HelmChartReconciler) cleanResources(cr *appv1.HelmChart) error {

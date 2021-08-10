@@ -4,7 +4,7 @@ Helm Operator is designed to install and manage Helm charts with Kubernetes CRD 
 
 Helm Operator does not create the Helm releases, it only uses Helm as the template engine to generate the Kubernetes resources.
 
-Currently it can only install the Helm resources, and more features are on the way!
+More features are on the way!
 
 
 ## How to use
@@ -31,10 +31,6 @@ spec:
 * Enable validating webhook
 
    This is used to ensure the user who create the `HelmChart` has the permission to create the resources inside the Helm chart.
-
-* Enable the update operation
-
-    This is used to ensure when user change the `HelmChart` CR, the resources can be updated to according to the change.
 
 * Enable the clean up
 
