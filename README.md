@@ -4,6 +4,8 @@ Helm Operator is designed to install and manage Helm charts with Kubernetes CRD 
 
 Helm Operator does not create the Helm releases, it only uses Helm as the template engine to generate the Kubernetes resources.
 
+Helm Operator enables Server Side Apply and enforces the fields ownership.
+
 More features are on the way!
 
 
