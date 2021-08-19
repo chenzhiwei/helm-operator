@@ -34,12 +34,6 @@ spec:
 
    This is used to ensure the user who create the `HelmChart` has the permission to create the resources inside the Helm chart.
 
-* Enable the clean up
-
-    When a Helm chart is updated, the resources inside it may change, so we need to ensure removed the resources can be cleaned up.
-
-    When a HelmChart CR is deleted, we need to ensure the cluster-scoped resources and the resources in another namespace can be cleaned up.
-
 * Enable the Helm hook and chart dependencies support
 
     Helm hooks usually cause a lot of problems, so it is better to not to use hooks.

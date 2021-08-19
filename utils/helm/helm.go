@@ -47,10 +47,16 @@ func getValues(name, namespace string, bytes []byte, chart *chart.Chart) (chartu
 	return values, nil
 }
 
-func GetManifests(name, namespace, path string, bytes []byte) ([]releaseutil.Manifest, error) {
+func GetManifests(name, namespace, path string, bytes []byte) ([][]byte, error) {
+	var result [][]byte
+
 	chart, err := getChart(path)
 	if err != nil {
 		return nil, err
+	}
+
+	for _, crd := range chart.CRDObjects() {
+		result = append(result, crd.File.Data)
 	}
 
 	values, err := getValues(name, namespace, bytes, chart)
@@ -75,5 +81,9 @@ func GetManifests(name, namespace, path string, bytes []byte) ([]releaseutil.Man
 		return nil, err
 	}
 
-	return manifests, err
+	for _, m := range manifests {
+		result = append(result, []byte(m.Content))
+	}
+
+	return result, nil
 }

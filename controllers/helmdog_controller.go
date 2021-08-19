@@ -110,7 +110,8 @@ func (r *HelmDogReconciler) deleteResources(ctx context.Context, resources []app
 	log := ctrl.LoggerFrom(ctx)
 
 	var errMsg []string
-	for _, res := range resources {
+	for i := len(resources) - 1; i >= 0; i-- {
+		res := resources[i]
 		log.Info("Delete Resource", "group", res.Group, "version", res.Version, "kind", res.Kind, "name", res.Name, "namespace", res.Namespace)
 		if err := r.deleteResource(ctx, res); err != nil {
 			errMsg = append(errMsg, fmt.Sprintf("Failed to delete: %s.%s/%s, name: %s, namespace: %s, msg: %s", res.Kind, res.Group, res.Version, res.Name, res.Namespace, err.Error()))
@@ -141,9 +142,13 @@ func (r *HelmDogReconciler) deleteResource(ctx context.Context, res appv1.Resour
 		return client.IgnoreNotFound(err)
 	}
 
-	obj.SetFinalizers(nil)
+	// Remove Resource finalizers and Ignore CRD finalizers
+	if len(obj.GetFinalizers()) > 0 && res.Kind != "CustomResourceDefinition" {
+		obj.SetFinalizers(nil)
+		return r.Update(ctx, obj)
+	}
 
-	return r.Update(ctx, obj)
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

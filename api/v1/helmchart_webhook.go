@@ -80,7 +80,7 @@ func (h *validatorHandler) Handle(ctx context.Context, req admission.Request) ad
 		}
 
 		for _, m := range manifests {
-			obj, _ := yaml.YamlToObject([]byte(m.Content))
+			obj, _ := yaml.YamlToObject(m)
 			obj.SetNamespace(helmChart.Namespace)
 			permit, err := h.checkPermission(ctx, userInfo, obj)
 			if err != nil {

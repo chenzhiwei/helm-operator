@@ -23,7 +23,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -68,7 +70,8 @@ func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// The CR is being deleted
 	if cr.DeletionTimestamp != nil {
 		// delete resources in other namespaces or cluster scoped resources
-		if err := r.cleanResources(cr); err != nil {
+		if err := r.cleanResources(ctx, cr); err != nil {
+			log.Error(err, "Failed to delete HelmDog "+req.Name)
 			return ctrl.Result{}, err
 		}
 
@@ -76,6 +79,7 @@ func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		if controllerutil.ContainsFinalizer(cr, constant.FinalizerName) {
 			controllerutil.RemoveFinalizer(cr, constant.FinalizerName)
 			if err := r.Update(ctx, cr); err != nil {
+				log.Error(err, "Failed to remove finalizer")
 				return ctrl.Result{}, err
 			}
 		}
@@ -87,6 +91,7 @@ func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if !controllerutil.ContainsFinalizer(cr, constant.FinalizerName) {
 		controllerutil.AddFinalizer(cr, constant.FinalizerName)
 		if err := r.Update(ctx, cr); err != nil {
+			log.Error(err, "Failed to add finalizer")
 			return ctrl.Result{}, err
 		}
 	}
@@ -97,22 +102,39 @@ func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
+	var resources []appv1.Resource
+
 	// var objects []*unstructured.Unstructured
 	for _, m := range manifests {
-		obj, _ := yaml.YamlToObject([]byte(m.Content))
+		obj, _ := yaml.YamlToObject(m)
 
-		// set namespace to obj, ignore failure because failure means cluster scoped resource
+		mapper, err := r.Client.RESTMapper().RESTMapping(obj.GroupVersionKind().GroupKind(), obj.GroupVersionKind().Version)
+		if err != nil {
+			log.Error(err, "Failed to get RESTMapper")
+			return ctrl.Result{}, err
+		}
+
+		// set namespace to obj because Helm does not add it
 		ns := obj.GetNamespace()
-		if ns == "" {
+		if ns == "" && mapper.Scope.Name() == "namespace" {
 			obj.SetNamespace(cr.Namespace)
 		}
 
 		if obj.GetNamespace() == cr.Namespace {
 			if err := controllerutil.SetControllerReference(cr, obj, r.Scheme); err != nil {
+				log.Error(err, "Failed to set owner reference")
 				return ctrl.Result{}, err
 			}
 		} else {
-			// store the cluster scoped resource somewhere for cleanResources
+			// store the cluster scoped resource for cleanResources
+			resource := appv1.Resource{
+				Group:     obj.GroupVersionKind().Group,
+				Version:   obj.GroupVersionKind().Version,
+				Kind:      obj.GroupVersionKind().Kind,
+				Name:      obj.GetName(),
+				Namespace: obj.GetNamespace(),
+			}
+			resources = append(resources, resource)
 		}
 
 		log.Info("Creating Helm manifest", "Object", obj)
@@ -121,7 +143,38 @@ func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			FieldManager: "helmchart-controller",
 			Force:        pointer.Bool(true),
 		}
-		if err := r.Client.Patch(ctx, obj, client.Apply, patchOptions); err != nil {
+		if err := r.Patch(ctx, obj, client.Apply, patchOptions); err != nil {
+			log.Error(err, "Failed running server side apply")
+			return ctrl.Result{}, err
+		}
+	}
+
+	if len(resources) > 0 {
+		helmDog := &unstructured.Unstructured{}
+		helmDog.Object = map[string]interface{}{
+			"spec": map[string]interface{}{
+				"resources": resources,
+			},
+		}
+
+		helmDog.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   appv1.GroupVersion.Group,
+			Version: appv1.GroupVersion.Version,
+			Kind:    "HelmDog",
+		})
+		helmDog.SetName(req.Name)
+		helmDog.SetNamespace(req.Namespace)
+
+		controllerutil.AddFinalizer(helmDog, constant.FinalizerName)
+
+		log.Info("Creating HelmDog", "Name", req.Name)
+		// TODO: better server side apply
+		patchOptions := &client.PatchOptions{
+			FieldManager: "helmchart-controller",
+			Force:        pointer.Bool(true),
+		}
+		if err := r.Patch(ctx, helmDog, client.Apply, patchOptions); err != nil {
+			log.Error(err, "Failed running server side apply on helmdog")
 			return ctrl.Result{}, err
 		}
 	}
@@ -129,8 +182,13 @@ func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	return ctrl.Result{}, nil
 }
 
-func (r *HelmChartReconciler) cleanResources(cr *appv1.HelmChart) error {
-	return nil
+func (r *HelmChartReconciler) cleanResources(ctx context.Context, cr *appv1.HelmChart) error {
+	helmDog := &appv1.HelmDog{}
+	helmDog.SetName(cr.Name)
+	helmDog.SetNamespace(cr.Namespace)
+
+	err := r.Delete(ctx, helmDog)
+	return client.IgnoreNotFound(err)
 }
 
 // SetupWithManager sets up the controller with the Manager.
