@@ -32,3 +32,29 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - app.siji.io
+  resources:
+  - helmdogs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - app.siji.io
+  resources:
+  - helmdogs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - app.siji.io
+  resources:
+  - helmdogs/status
+  verbs:
+  - get
+  - patch
+  - update

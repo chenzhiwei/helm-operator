@@ -1,0 +1,24 @@
+# permissions for end users to edit helmdogs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: helmdog-editor-role
+rules:
+- apiGroups:
+  - app.siji.io
+  resources:
+  - helmdogs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - app.siji.io
+  resources:
+  - helmdogs/status
+  verbs:
+  - get

@@ -1,0 +1,101 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
+  name: helmdogs.app.siji.io
+spec:
+  group: app.siji.io
+  names:
+    kind: HelmDog
+    listKind: HelmDogList
+    plural: helmdogs
+    singular: helmdog
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: HelmDog is the Schema for the helmdogs API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: HelmDogSpec defines the desired state of HelmDog
+            properties:
+              resources:
+                description: Resources is the resources that to be deleted when uninstall
+                  a helm chart
+                items:
+                  description: Resource is the resource indentifier
+                  properties:
+                    group:
+                      type: string
+                    kind:
+                      type: string
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                    version:
+                      type: string
+                  required:
+                  - kind
+                  - name
+                  - version
+                  type: object
+                type: array
+            required:
+            - resources
+            type: object
+          status:
+            description: HelmDogStatus defines the observed state of HelmDog
+            properties:
+              resources:
+                description: Resources is the current resources in HelmDog
+                items:
+                  description: Resource is the resource indentifier
+                  properties:
+                    group:
+                      type: string
+                    kind:
+                      type: string
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                    version:
+                      type: string
+                  required:
+                  - kind
+                  - name
+                  - version
+                  type: object
+                type: array
+            required:
+            - resources
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
