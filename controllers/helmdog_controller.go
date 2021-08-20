@@ -132,20 +132,38 @@ func (r *HelmDogReconciler) deleteResource(ctx context.Context, res appv1.Resour
 		Version: res.Version,
 		Kind:    res.Kind,
 	})
-	obj.SetName(res.Name)
-	obj.SetNamespace(res.Namespace)
-	if err := r.Delete(ctx, obj); err != nil {
-		return client.IgnoreNotFound(err)
-	}
 
 	if err := r.Get(ctx, types.NamespacedName{Name: res.Name, Namespace: res.Namespace}, obj); err != nil {
 		return client.IgnoreNotFound(err)
 	}
 
-	// Remove Resource finalizers and Ignore CRD finalizers
-	if len(obj.GetFinalizers()) > 0 && res.Kind != "CustomResourceDefinition" {
+	// Do not delete the resource if it has annotation app.siji.io/keep
+	// This is mainly for multiple charts share same resource
+	if _, ok := obj.GetAnnotations()["app.siji.io/keep"]; ok {
+		return nil
+	}
+
+	// Do not delete the CRD
+	if res.Kind == "CustomResourceDefinition" {
+		return nil
+	}
+
+	// Delete the resource
+	if err := r.Delete(ctx, obj); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+
+	// Trying to get the resource
+	if err := r.Get(ctx, types.NamespacedName{Name: res.Name, Namespace: res.Namespace}, obj); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+
+	// Force delete the resource by removing its finalizers
+	if len(obj.GetFinalizers()) > 0 {
 		obj.SetFinalizers(nil)
-		return r.Update(ctx, obj)
+		if err := r.Update(ctx, obj); err != nil {
+			return client.IgnoreNotFound(err)
+		}
 	}
 
 	return nil
