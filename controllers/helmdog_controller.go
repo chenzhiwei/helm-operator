@@ -58,7 +58,7 @@ func (r *HelmDogReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	cr := &appv1.HelmDog{}
 	if err := r.Get(ctx, req.NamespacedName, cr); err != nil {
 		if !errors.IsNotFound(err) {
-			log.Error(err, "Failed to get HelmDog")
+			log.Error(err, "failed to get HelmDog")
 		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -66,14 +66,14 @@ func (r *HelmDogReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// The CR is being deleted
 	if cr.DeletionTimestamp != nil {
 		if err := r.deleteResources(ctx, cr.Spec.Resources); err != nil {
-			log.Error(err, "Failed to delete resources")
+			log.Error(err, "failed to delete resources")
 			return ctrl.Result{}, err
 		}
 
 		cr.SetFinalizers(nil)
 		if err := r.Update(ctx, cr); err != nil {
 			if !errors.IsNotFound(err) {
-				log.Error(err, "Failed to remove finalizers")
+				log.Error(err, "failed to remove finalizers")
 			}
 			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
@@ -90,7 +90,7 @@ func (r *HelmDogReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	resources := utils.GetDeletedResources(cr.Spec.Resources, cr.Status.Resources)
 	if len(resources) > 0 {
 		if err := r.deleteResources(ctx, resources); err != nil {
-			log.Error(err, "Failed to delete resources")
+			log.Error(err, "failed to delete resources")
 			return ctrl.Result{}, err
 		}
 	}
@@ -98,7 +98,7 @@ func (r *HelmDogReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Update status to use new resources
 	cr.Status.Resources = cr.Spec.Resources
 	if err := r.Status().Update(ctx, cr); err != nil {
-		log.Error(err, "Failed to update status")
+		log.Error(err, "failed to update status")
 		return ctrl.Result{}, err
 	}
 
@@ -111,7 +111,7 @@ func (r *HelmDogReconciler) deleteResources(ctx context.Context, resources []app
 	var errMsg []string
 	for i := len(resources) - 1; i >= 0; i-- {
 		res := resources[i]
-		log.Info("Delete Resource", "group", res.Group, "version", res.Version, "kind", res.Kind, "name", res.Name, "namespace", res.Namespace)
+		log.Info("delete Resource", "group", res.Group, "version", res.Version, "kind", res.Kind, "name", res.Name, "namespace", res.Namespace)
 		if err := r.deleteResource(ctx, res); err != nil {
 			errMsg = append(errMsg, fmt.Sprintf("Failed to delete: %s.%s/%s, name: %s, namespace: %s, msg: %s", res.Kind, res.Group, res.Version, res.Name, res.Namespace, err.Error()))
 		}

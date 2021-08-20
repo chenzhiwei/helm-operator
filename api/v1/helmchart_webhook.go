@@ -75,7 +75,7 @@ func (h *validatorHandler) Handle(ctx context.Context, req admission.Request) ad
 	if req.Operation == admissionv1.Create || req.Operation == admissionv1.Update {
 		manifests, err := helm.GetManifests(helmChart.Name, helmChart.Namespace, helmChart.Spec.Chart.Path, helmChart.Spec.Values.Raw)
 		if err != nil {
-			helmchartlog.Error(err, "Failed to get Helm manifests")
+			helmchartlog.Error(err, "failed to get Helm manifests")
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 
@@ -84,7 +84,7 @@ func (h *validatorHandler) Handle(ctx context.Context, req admission.Request) ad
 			obj.SetNamespace(helmChart.Namespace)
 			permit, err := h.checkPermission(ctx, userInfo, obj)
 			if err != nil {
-				helmchartlog.Error(err, "Failed to check permission")
+				helmchartlog.Error(err, "failed to check permission")
 				return admission.Errored(http.StatusBadRequest, err)
 			}
 			if permit == false {
