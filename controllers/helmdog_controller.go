@@ -88,19 +88,18 @@ func (r *HelmDogReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Remove the unused resources
 	resources := utils.GetDeletedResources(cr.Spec.Resources, cr.Status.Resources)
-	if len(resources) == 0 {
-		return ctrl.Result{}, nil
-	} else {
+	if len(resources) > 0 {
 		if err := r.deleteResources(ctx, resources); err != nil {
 			log.Error(err, "Failed to delete resources")
 			return ctrl.Result{}, err
 		}
+	}
 
-		cr.Status.Resources = cr.Spec.Resources
-		if err := r.Status().Update(ctx, cr); err != nil {
-			log.Error(err, "Failed to update status")
-			return ctrl.Result{}, err
-		}
+	// Update status to use new resources
+	cr.Status.Resources = cr.Spec.Resources
+	if err := r.Status().Update(ctx, cr); err != nil {
+		log.Error(err, "Failed to update status")
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
