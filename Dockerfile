@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.16 as builder
+FROM golang:1.17 as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -23,6 +23,7 @@ FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/manager .
 COPY config/crd/bases/app.siji.io_helmcharts.yaml ./config/crd/bases/app.siji.io_helmcharts.yaml
+COPY config/crd/bases/app.siji.io_helmdogs.yaml ./config/crd/bases/app.siji.io_helmdogs.yaml
 COPY config/webhook/manifests.yaml ./config/webhook/manifests.yaml
 COPY config/webhook/service.yaml ./config/webhook/service.yaml
 USER 65532:65532

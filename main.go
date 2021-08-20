@@ -18,7 +18,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"time"
 
@@ -84,10 +83,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	// if err := createCRD(mgr.GetClient(), mgr.GetAPIReader()); err != nil {
-	// 	setupLog.Error(err, "unable to create controller resources", "controller", "HelmChart")
-	// 	os.Exit(1)
-	// }
+	if err := createCRDs(mgr.GetClient()); err != nil {
+		setupLog.Error(err, "unable to create CRD resources", "crd", "HelmChart")
+		os.Exit(1)
+	}
 
 	if err := (&controllers.HelmChartReconciler{
 		Client: mgr.GetClient(),
@@ -97,10 +96,10 @@ func main() {
 		os.Exit(1)
 	}
 	if os.Getenv("WEBHOOKS_ENABLED") == "true" {
-		// if err := createWebhooks(mgr.GetClient(), mgr.GetAPIReader()); err != nil {
-		// 	setupLog.Error(err, "unable to create webhook resources", "webhook", "HelmChart")
-		// 	os.Exit(1)
-		// }
+		if err := createWebhooks(mgr.GetClient()); err != nil {
+			setupLog.Error(err, "unable to create webhook resources", "webhook", "HelmChart")
+			os.Exit(1)
+		}
 		if err := (&appv1.HelmChart{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "HelmChart")
 			os.Exit(1)
@@ -131,27 +130,20 @@ func main() {
 	}
 }
 
-func createCRD(client client.Client, reader client.Reader) error {
-	path := "config/crd/bases/app.siji.io_helmcharts.yaml"
-	return yaml.CreateOrUpdateFromYaml(path, client, reader)
+func createCRDs(c client.Client) error {
+	files := []string{
+		"config/crd/bases/app.siji.io_helmcharts.yaml",
+		"config/crd/bases/app.siji.io_helmdogs.yaml",
+	}
+
+	return yaml.CreateOrUpdateFromFiles(c, files)
 }
 
-func createWebhooks(client client.Client, reader client.Reader) error {
+func createWebhooks(c client.Client) error {
 	files := []string{
 		"config/webhook/service.yaml",
 		"config/webhook/manifests.yaml",
 	}
 
-	var errMsg string
-
-	for _, path := range files {
-		if err := yaml.CreateOrUpdateFromYaml(path, client, reader); err != nil {
-			errMsg = errMsg + err.Error()
-		}
-	}
-
-	if errMsg != "" {
-		return fmt.Errorf("Failed to create webhooks: %v", errMsg)
-	}
-	return nil
+	return yaml.CreateOrUpdateFromFiles(c, files)
 }
