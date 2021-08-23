@@ -3,6 +3,7 @@ module github.com/chenzhiwei/helm-operator
 go 1.16
 
 require (
+	github.com/chenzhiwei/certctl v0.1.1
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.13.0
 	helm.sh/helm/v3 v3.6.3

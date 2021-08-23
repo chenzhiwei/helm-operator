@@ -35,6 +35,7 @@ import (
 
 	appv1 "github.com/chenzhiwei/helm-operator/api/v1"
 	"github.com/chenzhiwei/helm-operator/controllers"
+	"github.com/chenzhiwei/helm-operator/utils/cert"
 	"github.com/chenzhiwei/helm-operator/utils/yaml"
 	//+kubebuilder:scaffold:imports
 )
@@ -96,10 +97,12 @@ func main() {
 		os.Exit(1)
 	}
 	if os.Getenv("WEBHOOKS_ENABLED") == "true" {
-		if err := createWebhooks(mgr.GetClient()); err != nil {
-			setupLog.Error(err, "unable to create webhook resources", "webhook", "HelmChart")
+		// Generate TLS cert and update WebhookConfiguration caBundle
+		if err := cert.SetupTLSCert(mgr.GetClient(), mgr.GetAPIReader()); err != nil {
+			setupLog.Error(err, "setup webhook TLS certificate", "webhook", "HelmChart")
 			os.Exit(1)
 		}
+
 		if err := (&appv1.HelmChart{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "HelmChart")
 			os.Exit(1)
@@ -134,15 +137,6 @@ func createCRDs(c client.Client) error {
 	files := []string{
 		"config/crd/bases/app.siji.io_helmcharts.yaml",
 		"config/crd/bases/app.siji.io_helmdogs.yaml",
-	}
-
-	return yaml.CreateOrUpdateFromFiles(c, files)
-}
-
-func createWebhooks(c client.Client) error {
-	files := []string{
-		"config/webhook/service.yaml",
-		"config/webhook/manifests.yaml",
 	}
 
 	return yaml.CreateOrUpdateFromFiles(c, files)
