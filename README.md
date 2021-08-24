@@ -53,13 +53,42 @@ spec:
 ```
 
 
+## Design Idea
+
+Helm is a very popular package tool for Kubernetes, but it also has some limitations, especially handling CRDs.
+
+This Helm Operator leverages the Kubernetes CustomResourceDefinition to manage the full lifecycle of a Helm chart.
+
+Users can create a `HelmChart` CR with Helm chart path and values, the operator will use Helm library to generate the final manifests and then call the Kubernetes API to CRUD on these manifests.
+
+For Helm chart manifests have same namespace with the `HelmChart` CR, the operator will add an ownerreference to these manifests; for those manifests who are cluster scoped or in different namespaces, the operator will create another `HelmDog` CR to store them for later update or delete.
+
+When a Helm chart is updated, there may have newly added and removed manifests, the operator will find the diff and perform creating or removing actions on them.
+
+
+## Features
+
+1. Share same resource in multiple charts
+
+    This can be achieved by setting an annotation `app.siji.io/keep=anything`.
+
+    A use case is a ConfigMap contains some metadata, and multiple charts share this single ConfigMap.
+
+2. Force clean up the CRDs in a chart when uninstalling
+
+    This can be achieved by setting an annotation `app.siji.io/force-crd-delete=anything`.
+
+3. Runtime control on installed Helm charts
+
+    When users update the Helm chart objects, the operator will rollback them. Users should update the `HelmChart` CR to update the objects.
+
+4. Fine-grained permission control(WIP)
+
+   This is used to ensure the user who create the `HelmChart` has the permission to create the resources inside the Helm chart.
+
+   Users can enable the ValidatingWebhookConfiguration and each Create or Update operation will be validated to ensure the user has right permission.
+
+
 ## Limitations
 
 Do not support hooks and dependencies.
-
-
-## TODO
-
-* Enable validating webhook
-
-   This is used to ensure the user who create the `HelmChart` has the permission to create the resources inside the Helm chart.
