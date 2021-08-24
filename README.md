@@ -88,6 +88,16 @@ When a Helm chart is updated, there may have newly added and removed manifests, 
 
    Users can enable the ValidatingWebhookConfiguration and each Create or Update operation will be validated to ensure the user has right permission.
 
+5. Helm chart in standard OCI/Docker image(WIP)
+
+    In Kubernetes, all workloads are image based, setting up a Helm registry or HTTP server is a little annoying.
+
+    We can put the Helm chart directory or `.tgz` package into a standard OCI/Docker image, the only rule is we have an agreement to put it into last layer.
+
+    This operator can call image registry API to fetch the last layer and get the helm chart package.
+
+    An example is: `docker://docker.io/siji/helm-chart:latest#file=nginx-0.2.0.tgz`, the Helm chart package `nginx-0.2.0.tgz` is in the last layer of this image.
+
 
 ## Limitations
 
