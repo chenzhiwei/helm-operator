@@ -38,7 +38,7 @@ import (
 var helmchartlog = logf.Log.WithName("helmchart-resource")
 
 func (r *HelmChart) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	mgr.GetWebhookServer().Register("/validate-app-siji-io-v1-helmchart", &webhook.Admission{Handler: &validatorHandler{Client: mgr.GetClient()}})
+	mgr.GetWebhookServer().Register("/validate-app-siji-io-v1-helmchart", &webhook.Admission{Handler: &validatingHandler{Client: mgr.GetClient()}})
 
 	// leave this does not affect anything
 	return ctrl.NewWebhookManagedBy(mgr).
@@ -51,15 +51,16 @@ func (r *HelmChart) SetupWebhookWithManager(mgr ctrl.Manager) error {
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 //+kubebuilder:webhook:path=/validate-app-siji-io-v1-helmchart,mutating=false,failurePolicy=fail,sideEffects=None,groups=app.siji.io,resources=helmcharts,verbs=create;update,versions=v1,name=vhelmchart.kb.io,admissionReviewVersions={v1,v1beta1}
 
-type validatorHandler struct {
+type validatingHandler struct {
 	Client  client.Client
 	Decoder *admission.Decoder
 }
 
-func (h *validatorHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
+func (h *validatingHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
 	helmChart := &HelmChart{}
 	err := h.Decoder.Decode(req, helmChart)
 	if err != nil {
+		helmchartlog.Error(err, "failed to decode admission request to helmchart")
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
@@ -69,6 +70,9 @@ func (h *validatorHandler) Handle(ctx context.Context, req admission.Request) ad
 	// 2. Get the Helm chart resources
 	// 3. Use SubjectAccessReview to check if the user can CRUD Helm chart resources or not
 	// 4. Return admission.Allowed if has permission, otherwise admission.Denied
+	//
+	// In order to avoid the helm chart is changed later, so it is better to store the manifests somewhere for later use,
+	// and do not re-fetch the helm chart in helmchart controller reconcile function
 
 	userInfo := req.UserInfo
 
@@ -82,13 +86,14 @@ func (h *validatorHandler) Handle(ctx context.Context, req admission.Request) ad
 		for _, m := range manifests {
 			obj, _ := yaml.YamlToObject(m)
 			obj.SetNamespace(helmChart.Namespace)
-			permit, err := h.checkPermission(ctx, userInfo, obj)
+			status, err := h.checkPermission(ctx, userInfo, obj)
 			if err != nil {
 				helmchartlog.Error(err, "failed to check permission")
 				return admission.Errored(http.StatusBadRequest, err)
 			}
-			if permit == false {
-				return admission.Denied("")
+			if status.Allowed == false {
+				helmchartlog.Info("not allowed to create", "resource", obj.GetKind(), "reason", status.Reason)
+				return admission.Denied(status.Reason)
 			}
 		}
 	}
@@ -96,10 +101,10 @@ func (h *validatorHandler) Handle(ctx context.Context, req admission.Request) ad
 	return admission.Allowed("")
 }
 
-func (h *validatorHandler) checkPermission(ctx context.Context, userInfo authenticationv1.UserInfo, obj *unstructured.Unstructured) (bool, error) {
+func (h *validatingHandler) checkPermission(ctx context.Context, userInfo authenticationv1.UserInfo, obj *unstructured.Unstructured) (authorizationv1.SubjectAccessReviewStatus, error) {
 	mapper, err := h.Client.RESTMapper().RESTMapping(obj.GroupVersionKind().GroupKind(), obj.GroupVersionKind().Version)
 	if err != nil {
-		return false, err
+		return authorizationv1.SubjectAccessReviewStatus{}, err
 	}
 	sar := &authorizationv1.SubjectAccessReview{
 		Spec: authorizationv1.SubjectAccessReviewSpec{
@@ -118,9 +123,10 @@ func (h *validatorHandler) checkPermission(ctx context.Context, userInfo authent
 	}
 
 	if err := h.Client.Create(ctx, sar); err != nil {
-		return false, err
+		return authorizationv1.SubjectAccessReviewStatus{}, err
 	}
-	return sar.Status.Allowed, nil
+
+	return sar.Status, nil
 }
 
 func convertToSARExtra(extra map[string]authenticationv1.ExtraValue) map[string]authorizationv1.ExtraValue {
@@ -133,4 +139,9 @@ func convertToSARExtra(extra map[string]authenticationv1.ExtraValue) map[string]
 	}
 
 	return ret
+}
+
+func (h *validatingHandler) InjectDecoder(d *admission.Decoder) error {
+	h.Decoder = d
+	return nil
 }
