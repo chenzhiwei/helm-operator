@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -30,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appv1 "github.com/chenzhiwei/helm-operator/api/v1"
-	"github.com/chenzhiwei/helm-operator/utils"
 )
 
 // HelmDogReconciler reconciles a HelmDog object
@@ -90,7 +90,7 @@ func (r *HelmDogReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Remove the unused resources
-	resources := utils.GetDeletedResources(cr.Spec.Resources, cr.Status.Resources)
+	resources := getDeletedResources(cr.Spec.Resources, cr.Status.Resources)
 	if len(resources) > 0 {
 		log.V(3).Info("remove the unused resources in cr.Status.Resources")
 		if err := r.deleteResources(ctx, resources); err != nil {
@@ -177,4 +177,25 @@ func (r *HelmDogReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appv1.HelmDog{}).
 		Complete(r)
+}
+
+func getDeletedResources(resources, currentResources []appv1.Resource) []appv1.Resource {
+	var result []appv1.Resource
+	for _, resource := range currentResources {
+		if !containResource(resources, resource) {
+			result = append(result, resource)
+		}
+	}
+
+	return result
+}
+
+func containResource(resources []appv1.Resource, resource appv1.Resource) bool {
+	for _, res := range resources {
+		if reflect.DeepEqual(res, resource) {
+			return true
+		}
+	}
+
+	return false
 }

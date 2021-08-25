@@ -17,7 +17,10 @@ limitations under the License.
 package controllers
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"os"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -26,11 +29,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appv1 "github.com/chenzhiwei/helm-operator/api/v1"
+	"github.com/chenzhiwei/helm-operator/utils"
 	"github.com/chenzhiwei/helm-operator/utils/constant"
 	"github.com/chenzhiwei/helm-operator/utils/helm"
 	"github.com/chenzhiwei/helm-operator/utils/pointer"
@@ -97,10 +102,38 @@ func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 	}
 
-	manifests, err := helm.GetManifests(cr.Name, cr.Namespace, cr.Spec.Chart.Path, cr.Spec.Values.Raw)
-	if err != nil {
-		log.Error(err, "failed to generate Helm manifests")
-		return ctrl.Result{}, err
+	var err error
+	var manifests [][]byte
+
+	if os.Getenv("WEBHOOKS_ENABLED") == "true" {
+		secretName := utils.ManifestsSecretName(cr.Name, cr.Namespace)
+		log.V(1).Info("fetching Helm manifests from secret", "Secret", secretName+"/"+constant.HelmOperatorNamespace)
+		secret := &corev1.Secret{}
+		namespacedName := types.NamespacedName{
+			Name:      secretName,
+			Namespace: constant.HelmOperatorNamespace,
+		}
+		if err := r.Get(ctx, namespacedName, secret); err != nil {
+			if errors.IsNotFound(err) {
+				return ctrl.Result{}, fmt.Errorf("webhook enabled, but no manifests secret found")
+			}
+
+			return ctrl.Result{}, err
+		}
+		mBytes, ok := secret.Data["manifests"]
+		if ok {
+			sep := []byte("\n---\n")
+			manifests = bytes.Split(mBytes, sep)
+		} else {
+			return ctrl.Result{}, fmt.Errorf("webhook enabled, but manifests secret format is incorrect")
+		}
+	} else {
+		log.V(1).Info("fetching Helm manifests from remote")
+		manifests, err = helm.GetManifests(cr.Name, cr.Namespace, cr.Spec.Chart.Path, cr.Spec.Values.Raw)
+		if err != nil {
+			log.Error(err, "failed to generate Helm manifests")
+			return ctrl.Result{}, err
+		}
 	}
 
 	var resources []appv1.Resource

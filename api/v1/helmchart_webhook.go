@@ -17,18 +17,24 @@ limitations under the License.
 package v1
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authorizationv1 "k8s.io/api/authorization/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	"github.com/chenzhiwei/helm-operator/utils"
+	"github.com/chenzhiwei/helm-operator/utils/constant"
 	"github.com/chenzhiwei/helm-operator/utils/helm"
 	"github.com/chenzhiwei/helm-operator/utils/yaml"
 )
@@ -69,8 +75,8 @@ func (h *validatingHandler) Handle(ctx context.Context, req admission.Request) a
 	// 3. Use SubjectAccessReview to check if the user can CRUD Helm chart resources or not
 	// 4. Return admission.Allowed if has permission, otherwise admission.Denied
 	//
-	// In order to avoid the helm chart is changed later, so it is better to store the manifests somewhere for later use,
-	// and do not re-fetch the helm chart in helmchart controller reconcile function
+	// In order to avoid the helm chart is changed later, so storing the Helm manifests to a secret for later use
+	// and do not re-fetch the Helm chart from remote in helmchart controller reconcile function
 
 	userInfo := req.UserInfo
 
@@ -91,7 +97,37 @@ func (h *validatingHandler) Handle(ctx context.Context, req admission.Request) a
 			}
 			if status.Allowed == false {
 				log.Info("not allowed to create", "resource", obj.GetKind(), "reason", status.Reason)
-				return admission.Denied(status.Reason)
+				reason := status.Reason
+				if reason == "" {
+					reason = "not allowed to create " + obj.GetKind()
+				}
+				return admission.Denied(reason)
+			}
+		}
+
+		sep := []byte("\n---\n")
+		manifestsBytes := bytes.Join(manifests, sep)
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      utils.ManifestsSecretName(helmChart.Name, helmChart.Namespace),
+				Namespace: constant.HelmOperatorNamespace,
+			},
+
+			Data: map[string][]byte{
+				"manifests": manifestsBytes,
+			},
+		}
+
+		log.V(2).Info("storing Helm manifests to a secret")
+		if err := h.Client.Create(ctx, secret); err != nil {
+			if !errors.IsAlreadyExists(err) {
+				log.Error(err, "failed to create the manifests secret")
+				return admission.Errored(http.StatusBadRequest, err)
+			}
+			log.V(2).Info("update the manifests secret with new manifestsBytes")
+			if err := h.Client.Update(ctx, secret); err != nil {
+				log.Error(err, "failed to update the manifests secret")
+				return admission.Errored(http.StatusBadRequest, err)
 			}
 		}
 	}
