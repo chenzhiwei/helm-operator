@@ -26,16 +26,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/chenzhiwei/helm-operator/utils/helm"
 	"github.com/chenzhiwei/helm-operator/utils/yaml"
 )
-
-// log is for logging in this package.
-var helmchartlog = logf.Log.WithName("helmchart-resource")
 
 func (r *HelmChart) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	mgr.GetWebhookServer().Register("/validate-app-siji-io-v1-helmchart", &webhook.Admission{Handler: &validatingHandler{Client: mgr.GetClient()}})
@@ -57,10 +53,12 @@ type validatingHandler struct {
 }
 
 func (h *validatingHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
+	var log = ctrl.Log.WithName("webhook.helmchart")
+
 	helmChart := &HelmChart{}
 	err := h.Decoder.Decode(req, helmChart)
 	if err != nil {
-		helmchartlog.Error(err, "failed to decode admission request to helmchart")
+		log.Error(err, "failed to decode admission request to helmchart")
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
@@ -79,7 +77,7 @@ func (h *validatingHandler) Handle(ctx context.Context, req admission.Request) a
 	if req.Operation == admissionv1.Create || req.Operation == admissionv1.Update {
 		manifests, err := helm.GetManifests(helmChart.Name, helmChart.Namespace, helmChart.Spec.Chart.Path, helmChart.Spec.Values.Raw)
 		if err != nil {
-			helmchartlog.Error(err, "failed to get Helm manifests")
+			log.Error(err, "failed to get Helm manifests")
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 
@@ -88,11 +86,11 @@ func (h *validatingHandler) Handle(ctx context.Context, req admission.Request) a
 			obj.SetNamespace(helmChart.Namespace)
 			status, err := h.checkPermission(ctx, userInfo, obj)
 			if err != nil {
-				helmchartlog.Error(err, "failed to check permission")
+				log.Error(err, "failed to check permission")
 				return admission.Errored(http.StatusBadRequest, err)
 			}
 			if status.Allowed == false {
-				helmchartlog.Info("not allowed to create", "resource", obj.GetKind(), "reason", status.Reason)
+				log.Info("not allowed to create", "resource", obj.GetKind(), "reason", status.Reason)
 				return admission.Denied(status.Reason)
 			}
 		}

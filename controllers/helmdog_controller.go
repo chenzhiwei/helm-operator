@@ -53,20 +53,22 @@ type HelmDogReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
 func (r *HelmDogReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := ctrl.LoggerFrom(ctx)
+	log := ctrl.Log.WithName("controller.helmdog").WithValues("HelmDog", req.Name+"/"+req.Namespace)
 
 	cr := &appv1.HelmDog{}
 	if err := r.Get(ctx, req.NamespacedName, cr); err != nil {
 		if !errors.IsNotFound(err) {
 			log.Error(err, "failed to get HelmDog")
 		}
+		log.V(3).Info("the reconciled helmdog is not found")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	// The CR is being deleted
 	if cr.DeletionTimestamp != nil {
+		log.V(3).Info("deleting the helmdog")
 		if err := r.deleteResources(ctx, cr.Spec.Resources); err != nil {
-			log.Error(err, "failed to delete resources")
+			log.Error(err, "failed to delete extra resources")
 			return ctrl.Result{}, err
 		}
 
@@ -83,14 +85,16 @@ func (r *HelmDogReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// No resources in CR, ignore it
 	if len(cr.Spec.Resources) == 0 {
+		log.V(3).Info("no resources specified in CR.Spec")
 		return ctrl.Result{}, nil
 	}
 
 	// Remove the unused resources
 	resources := utils.GetDeletedResources(cr.Spec.Resources, cr.Status.Resources)
 	if len(resources) > 0 {
+		log.V(3).Info("remove the unused resources in cr.Status.Resources")
 		if err := r.deleteResources(ctx, resources); err != nil {
-			log.Error(err, "failed to delete resources")
+			log.Error(err, "failed to remove unused resources in cr.Status.Resources")
 			return ctrl.Result{}, err
 		}
 	}
@@ -98,7 +102,7 @@ func (r *HelmDogReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Update status to use new resources
 	cr.Status.Resources = cr.Spec.Resources
 	if err := r.Status().Update(ctx, cr); err != nil {
-		log.Error(err, "failed to update status")
+		log.Error(err, "failed to update cr.Status.Resources with new resources")
 		return ctrl.Result{}, err
 	}
 
@@ -106,7 +110,7 @@ func (r *HelmDogReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 func (r *HelmDogReconciler) deleteResources(ctx context.Context, resources []appv1.Resource) error {
-	log := ctrl.LoggerFrom(ctx)
+	log := ctrl.Log.WithName("controller.helmdog")
 
 	var errMsg []string
 	for i := len(resources) - 1; i >= 0; i-- {

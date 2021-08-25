@@ -57,21 +57,22 @@ type HelmChartReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
 func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := ctrl.LoggerFrom(ctx)
-
+	log := ctrl.Log.WithName("controller.helmchart").WithValues("HelmChart", req.Name+"/"+req.Namespace)
 	cr := &appv1.HelmChart{}
 	if err := r.Get(ctx, req.NamespacedName, cr); err != nil {
 		if !errors.IsNotFound(err) {
 			log.Error(err, "failed to get HelmChart")
 		}
+		log.V(3).Info("the reconciled helmchart is not found")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	// The CR is being deleted
 	if cr.DeletionTimestamp != nil {
+		log.V(3).Info("deleting the helmchart")
 		// delete resources in other namespaces or cluster scoped resources
 		if err := r.cleanResources(ctx, cr); err != nil {
-			log.Error(err, "failed to delete HelmDog "+req.Name)
+			log.Error(err, "failed to clean extra resources", "HelmDog", req.Name)
 			return ctrl.Result{}, err
 		}
 
@@ -137,7 +138,7 @@ func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			resources = append(resources, resource)
 		}
 
-		log.Info("creating Helm manifest", "Object", obj)
+		log.Info("creating Helm manifest", "kind", obj.GetKind(), "name", obj.GetName(), "namespace", obj.GetNamespace())
 		// TODO: better server side apply
 		patchOptions := &client.PatchOptions{
 			FieldManager: "helmchart-controller",
@@ -167,7 +168,7 @@ func (r *HelmChartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 		controllerutil.AddFinalizer(helmDog, constant.FinalizerName)
 
-		log.Info("creating HelmDog", "Name", req.Name)
+		log.Info("creating HelmDog for extra resources")
 		// TODO: better server side apply
 		patchOptions := &client.PatchOptions{
 			FieldManager: "helmchart-controller",

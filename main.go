@@ -85,7 +85,7 @@ func main() {
 	}
 
 	if err := createCRDs(mgr.GetClient()); err != nil {
-		setupLog.Error(err, "unable to create CRD resources", "crd", "HelmChart")
+		setupLog.Error(err, "unable to create CRD resources")
 		os.Exit(1)
 	}
 
@@ -99,7 +99,7 @@ func main() {
 	if os.Getenv("WEBHOOKS_ENABLED") == "true" {
 		// Generate TLS cert and update WebhookConfiguration caBundle
 		if err := cert.SetupTLSCert(mgr.GetClient(), mgr.GetAPIReader()); err != nil {
-			setupLog.Error(err, "setup webhook TLS certificate", "webhook", "HelmChart")
+			setupLog.Error(err, "unable to setup webhook TLS certificate")
 			os.Exit(1)
 		}
 
