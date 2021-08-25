@@ -68,8 +68,8 @@ spec:
   values:
     replicaCount: 2
     image:
-      repository: docker.io/siji/nginx
-      tag: latest
+      repository: docker.io/library/nginx
+      tag: alpine
 ```
 
 
