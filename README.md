@@ -32,6 +32,26 @@ kubectl delete namespace helm-operator
 kubectl delete crd helmcharts.app.siji.io helmdogs.app.siji.io
 ```
 
+## How to install with webhook enabled
+
+```
+kubectl apply -f https://github.com/chenzhiwei/helm-operator/raw/master/config/allinone-webhook.yaml
+```
+
+By default, it will create the normal resources and plus following:
+
+* helm-operator-webhook-service, which is used for validating webhook
+* helm-operator-validating-webhook, a `ValidatingWebhookConfiguration` to validate the permissions
+
+Run following commands to uninstall:
+
+```
+kubectl delete validatingwebhookconfiguration helm-operator-validating-webhook
+kubectl delete helmchart --all --all-namespaces
+kubectl delete helmdog --all --all-namespaces
+kubectl delete namespace helm-operator
+kubectl delete crd helmcharts.app.siji.io helmdogs.app.siji.io
+```
 
 ## How to use
 
@@ -82,7 +102,7 @@ When a Helm chart is updated, there may have newly added and removed manifests, 
 
     When users update the Helm chart objects, the operator will rollback them. Users should update the `HelmChart` CR to update the objects.
 
-4. Fine-grained permission control(WIP)
+4. Fine-grained permission control
 
    This is used to ensure the user who create the `HelmChart` has the permission to create the resources inside the Helm chart.
 
