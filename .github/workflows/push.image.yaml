@@ -20,7 +20,7 @@ jobs:
     - name: setup golang
       uses: actions/setup-go@v2
       with:
-        go-version: 1.17
+        go-version: 1.19
 
     - name: login docker hub
       uses: docker/login-action@v1

@@ -1,6 +1,6 @@
 module github.com/chenzhiwei/helm-operator
 
-go 1.18
+go 1.19
 
 require (
 	github.com/chenzhiwei/certctl v0.3.2
