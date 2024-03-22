@@ -1,0 +1,32 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: helm-operator-role
+rules:
+- apiGroups:
+  - app.siji.io
+  resources:
+  - helmreleases
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - app.siji.io
+  resources:
+  - helmreleases/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - app.siji.io
+  resources:
+  - helmreleases/status
+  verbs:
+  - get
+  - patch
+  - update
