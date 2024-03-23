@@ -33,6 +33,7 @@ import (
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
@@ -95,6 +96,15 @@ func (r *HelmReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
+	// add finalizer
+	if !controllerutil.ContainsFinalizer(cr, finalizerName) {
+		controllerutil.AddFinalizer(cr, finalizerName)
+		if err := r.Update(ctx, cr); err != nil {
+			log.Error(err, "failed to add finalizer")
+			return ctrl.Result{}, err
+		}
+	}
+
 	// record the hashcode of release Spec
 	hashcode, err := hashstructure.Hash(cr.Spec, hashstructure.FormatV2, nil)
 	if err != nil {
@@ -130,11 +140,12 @@ func (r *HelmReleaseReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// update hashcode to the status
 	cr.Status.HashedSpec = fmt.Sprintf("%d", hashcode)
 	cr.Status.Revision = strconv.Itoa(release.Version)
+	cr.Status.Status = string(release.Info.Status)
 	cr.Status.Chart = fmt.Sprintf("%s-%s", release.Chart.Name(), release.Chart.Metadata.Version)
 	if release.Info.LastDeployed.IsZero() {
-		cr.Status.Updated = cr.CreationTimestamp.String()
+		cr.Status.Updated = cr.CreationTimestamp
 	} else {
-		cr.Status.Updated = release.Info.LastDeployed.String()
+		cr.Status.Updated = metav1.Time(release.Info.LastDeployed)
 	}
 
 	if err := r.Status().Update(ctx, cr); err != nil {
@@ -151,10 +162,14 @@ func (r *HelmReleaseReconciler) installHelmRelease(ctx context.Context, cr *appv
 	install.Namespace = cr.Namespace
 	install.ChartPathOptions.InsecureSkipTLSverify = cr.Spec.Chart.SkipTLSVerify
 
-	lastIndex := strings.LastIndex(cr.Spec.Chart.Address, ":")
-	install.ChartPathOptions.Version = cr.Spec.Chart.Address[lastIndex+1:]
+	addr := cr.Spec.Chart.Address
+	if strings.HasPrefix(addr, "oci://") {
+		lastIndex := strings.LastIndex(cr.Spec.Chart.Address, ":")
+		install.ChartPathOptions.Version = cr.Spec.Chart.Address[lastIndex+1:]
+		addr = addr[:lastIndex]
+	}
 
-	path, err := install.ChartPathOptions.LocateChart(cr.Spec.Chart.Address[:lastIndex], cli.New())
+	path, err := install.ChartPathOptions.LocateChart(addr, cli.New())
 	if err != nil {
 		return nil, err
 	}
@@ -181,10 +196,14 @@ func (r *HelmReleaseReconciler) upgradeHelmRelease(ctx context.Context, cr *appv
 	upgrade.Namespace = cr.Namespace
 	upgrade.ChartPathOptions.InsecureSkipTLSverify = cr.Spec.Chart.SkipTLSVerify
 
-	lastIndex := strings.LastIndex(cr.Spec.Chart.Address, ":")
-	upgrade.ChartPathOptions.Version = cr.Spec.Chart.Address[lastIndex+1:]
+	addr := cr.Spec.Chart.Address
+	if strings.HasPrefix(addr, "oci://") {
+		lastIndex := strings.LastIndex(cr.Spec.Chart.Address, ":")
+		upgrade.ChartPathOptions.Version = cr.Spec.Chart.Address[lastIndex+1:]
+		addr = addr[:lastIndex]
+	}
 
-	path, err := upgrade.ChartPathOptions.LocateChart(cr.Spec.Chart.Address[:lastIndex], cli.New())
+	path, err := upgrade.ChartPathOptions.LocateChart(addr, cli.New())
 	if err != nil {
 		return nil, err
 	}

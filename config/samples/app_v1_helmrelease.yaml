@@ -1,12 +1,12 @@
 apiVersion: app.siji.io/v1
 kind: HelmRelease
 metadata:
-  labels:
-    app.kubernetes.io/name: helmrelease
-    app.kubernetes.io/instance: helmrelease-sample
-    app.kubernetes.io/part-of: helm-operator
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/created-by: helm-operator
-  name: helmrelease-sample
+  name: nginx
 spec:
-  # TODO(user): Add fields here
+  chart:
+    address: https://gitlab.com/chenzhiwei/charts/-/raw/master/release/nginx-0.1.0.tgz
+  values:
+    replicaCount: 1
+    image:
+      repository: docker.io/library/nginx
+      tag: alpine

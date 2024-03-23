@@ -26,17 +26,11 @@ import (
 
 // HelmReleaseSpec defines the desired state of HelmRelease
 type HelmReleaseSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// Chart is Helm Chart object
 	Chart HelmChart `json:"chart"`
 
 	// Values is Helm Release values
 	Values runtime.RawExtension `json:"values,omitempty"`
-
-	// Foo is an example field of HelmRelease. Edit helmrelease_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
 }
 
 // HelmChart is the Helm Chart
@@ -62,14 +56,23 @@ type HelmReleaseStatus struct {
 	// Revision is the Helm Release revision
 	Revision string `json:"revision,omitempty"`
 
+	// Status is the Helm Release status
+	Status string `json:"status,omitempty"`
+
 	// Chart is chart that used for the Helm Release
 	Chart string `json:"chart,omitempty"`
 
 	// Updated is the Helm Release last updated time
-	Updated string `json:"updated,omitempty"`
+	Updated metav1.Time `json:"updated,omitempty"`
 }
 
 //+kubebuilder:object:root=true
+//+kubebuilder:printcolumn:name="NAMESPACE",type=string,JSONPath=`.metadata.namespace`
+//+kubebuilder:printcolumn:name="REVISION",type=string,JSONPath=`.status.revision`
+//+kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.status`
+//+kubebuilder:printcolumn:name="CHART",type=string,JSONPath=`.status.chart`
+//+kubebuilder:printcolumn:name="UPDATED",type=string,JSONPath=`.status.updated`
+//+kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 //+kubebuilder:subresource:status
 
 // HelmRelease is the Schema for the helmreleases API

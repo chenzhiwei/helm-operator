@@ -14,7 +14,26 @@ spec:
     singular: helmrelease
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - jsonPath: .metadata.namespace
+      name: NAMESPACE
+      type: string
+    - jsonPath: .status.revision
+      name: REVISION
+      type: string
+    - jsonPath: .status.status
+      name: STATUS
+      type: string
+    - jsonPath: .status.chart
+      name: CHART
+      type: string
+    - jsonPath: .status.updated
+      name: UPDATED
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1
     schema:
       openAPIV3Schema:
         description: HelmRelease is the Schema for the helmreleases API
@@ -56,10 +75,6 @@ spec:
                 required:
                 - address
                 type: object
-              foo:
-                description: Foo is an example field of HelmRelease. Edit helmrelease_types.go
-                  to remove/update
-                type: string
               values:
                 description: Values is Helm Release values
                 type: object
@@ -79,8 +94,12 @@ spec:
               revision:
                 description: Revision is the Helm Release revision
                 type: string
+              status:
+                description: Status is the Helm Release status
+                type: string
               updated:
                 description: Updated is the Helm Release last updated time
+                format: date-time
                 type: string
             type: object
         type: object
